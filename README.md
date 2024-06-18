@@ -2,6 +2,8 @@
 
 Emulates behavior of autopilot for drones. In this example it's communicating through UART and simulates functionality of sending information of reference speed to ESC controlling BLDC Motor (from 0% to 100%).
 
+There's another project that works as a controller for this emulator. It's a gui application - [UART Communicator](https://github.com/alaziuk/UART-Commuincator).
+
 It's a STM32CubeIDE project for NUCLEO-F767ZL.
 
 The project uses interrupts to listen to a 5-byte message. The message begins with "AT" and ends with "xyz", where:
