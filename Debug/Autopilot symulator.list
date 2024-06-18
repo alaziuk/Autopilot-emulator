@@ -1403,28 +1403,28 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
  8000b26:	789b      	ldrb	r3, [r3, #2]
  8000b28:	2b30      	cmp	r3, #48	; 0x30
  8000b2a:	d103      	bne.n	8000b34 <HAL_UART_RxCpltCallback+0x114>
-					tx_perc[11] = ' ';
+					tx_perc[9] = ' ';
  8000b2c:	4b15      	ldr	r3, [pc, #84]	; (8000b84 <HAL_UART_RxCpltCallback+0x164>)
  8000b2e:	2220      	movs	r2, #32
- 8000b30:	72da      	strb	r2, [r3, #11]
+ 8000b30:	725a      	strb	r2, [r3, #9]
  8000b32:	e003      	b.n	8000b3c <HAL_UART_RxCpltCallback+0x11c>
 				} else {
-					tx_perc[11] = rx_data[2];
+					tx_perc[9] = rx_data[2];
  8000b34:	4b0f      	ldr	r3, [pc, #60]	; (8000b74 <HAL_UART_RxCpltCallback+0x154>)
  8000b36:	789a      	ldrb	r2, [r3, #2]
  8000b38:	4b12      	ldr	r3, [pc, #72]	; (8000b84 <HAL_UART_RxCpltCallback+0x164>)
- 8000b3a:	72da      	strb	r2, [r3, #11]
+ 8000b3a:	725a      	strb	r2, [r3, #9]
 				}
-				tx_perc[12] = rx_data[3];
+				tx_perc[10] = rx_data[3];
  8000b3c:	4b0d      	ldr	r3, [pc, #52]	; (8000b74 <HAL_UART_RxCpltCallback+0x154>)
  8000b3e:	78da      	ldrb	r2, [r3, #3]
  8000b40:	4b10      	ldr	r3, [pc, #64]	; (8000b84 <HAL_UART_RxCpltCallback+0x164>)
- 8000b42:	731a      	strb	r2, [r3, #12]
-				tx_perc[13] = rx_data[4];
+ 8000b42:	729a      	strb	r2, [r3, #10]
+				tx_perc[11] = rx_data[4];
  8000b44:	4b0b      	ldr	r3, [pc, #44]	; (8000b74 <HAL_UART_RxCpltCallback+0x154>)
  8000b46:	791a      	ldrb	r2, [r3, #4]
  8000b48:	4b0e      	ldr	r3, [pc, #56]	; (8000b84 <HAL_UART_RxCpltCallback+0x164>)
- 8000b4a:	735a      	strb	r2, [r3, #13]
+ 8000b4a:	72da      	strb	r2, [r3, #11]
 
 				HAL_UART_Transmit(&huart4, tx_perc, TX_PERC, UART_TIMEOUT);
  8000b4c:	230f      	movs	r3, #15

@@ -78,7 +78,7 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 /* USER CODE BEGIN PV */
 uint8_t tx_buffer[TX_BUFFER] = "Welcome to my kitchen\n\r";
 const uint8_t tx_boot[TX_BOOT] = "I'm up babyyyyy\n\r";
-uint8_t tx_perc[TX_PERC] = "\n\rUstawiam 100%\n\r";
+uint8_t tx_perc[TX_PERC] = "Ustawiam xyz%  \n\r";
 uint8_t rx_data[RX_DATA];
 const uint8_t numbers[NUMBERS] = {'0', '1', '2', '3' , '4', '5', '6', '7', '8', '9'};
 int at_found = 0;
@@ -517,12 +517,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 				}
 
 				if (rx_data[2] == '0') {
-					tx_perc[11] = ' ';
+					tx_perc[9] = ' ';
 				} else {
-					tx_perc[11] = rx_data[2];
+					tx_perc[9] = rx_data[2];
 				}
-				tx_perc[12] = rx_data[3];
-				tx_perc[13] = rx_data[4];
+				tx_perc[10] = rx_data[3];
+				tx_perc[11] = rx_data[4];
 
 				HAL_UART_Transmit(&huart4, tx_perc, TX_PERC, UART_TIMEOUT);
 
