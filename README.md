@@ -4,7 +4,7 @@ Emulates behavior of autopilot for drones. In this example it's communicating th
 
 There's another project that works as a controller for this emulator. It's a gui application - [UART Communicator](https://github.com/alaziuk/UART-Commuincator).
 
-It's a STM32CubeIDE project for NUCLEO-F767ZL.
+It's a STM32CubeIDE project for NUCLEO-F767ZI.
 
 The project uses interrupts to listen to a 5-byte message. The message begins with "AT" and ends with "xyz", where:
 * x is the value of the hundreds place
