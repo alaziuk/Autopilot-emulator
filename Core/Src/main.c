@@ -27,7 +27,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef enum {
+	NONE,
+	PWM,
+	CAN
+}CommunicationType;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -36,9 +40,12 @@
 #define TX_BUFFER 23
 #define TX_BOOT 17
 #define TX_PERC 17
+#define TX_TYPE 17
+#define TX_ASK 17
 #define RX_DATA 5
 #define UART_TIMEOUT 15
 #define NUMBERS 10
+#define CAN_DATA 8
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -66,9 +73,12 @@ ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDecr
 
 ETH_TxPacketConfig TxConfig;
 
+CAN_HandleTypeDef hcan1;
+
 ETH_HandleTypeDef heth;
 
-TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
+DMA_HandleTypeDef hdma_tim4_ch1;
 
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart3;
@@ -76,23 +86,38 @@ UART_HandleTypeDef huart3;
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
-uint8_t tx_buffer[TX_BUFFER] = "Welcome to my kitchen\n\r";
 const uint8_t tx_boot[TX_BOOT] = "I'm up babyyyyy\n\r";
 uint8_t tx_perc[TX_PERC] = "Ustawiam xyz%  \n\r";
+uint8_t tx_type[TX_TYPE] = "Ustawiam xyz   \n\r";
+uint8_t tx_ask[TX_ASK] = "Ustawione NONE \n\r";
 uint8_t rx_data[RX_DATA];
+
 const uint8_t numbers[NUMBERS] = {'0', '1', '2', '3' , '4', '5', '6', '7', '8', '9'};
+
 int at_found = 0;
 int percentageNumber = 0;
+CommunicationType communication_type = NONE;
+int test = 0;
+
+CAN_TxHeaderTypeDef TxHeader;
+CAN_RxHeaderTypeDef RxHeader;
+
+uint8_t txData[CAN_DATA];
+uint8_t rxData[CAN_DATA];
+
+uint32_t txMailbox;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_ETH_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
-static void MX_TIM3_Init(void);
 static void MX_UART4_Init(void);
+static void MX_TIM4_Init(void);
+static void MX_ETH_Init(void);
+static void MX_CAN1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -130,18 +155,30 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_ETH_Init();
+  MX_DMA_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
-  MX_TIM3_Init();
   MX_UART4_Init();
+  MX_TIM4_Init();
+  MX_ETH_Init();
+  MX_CAN1_Init();
   /* USER CODE BEGIN 2 */
 
   // start timer
-  HAL_TIM_Base_Start_IT(&htim3);
   HAL_UART_Receive_IT(&huart4, rx_data, RX_DATA);
   HAL_UART_Transmit(&huart4, tx_boot, TX_BOOT, UART_TIMEOUT);
 
+  /*
+  HAL_CAN_Start(&hcan1);
+  HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
+
+  TxHeader.DLC = 1;
+  TxHeader.IDE = CAN_ID_STD;
+  TxHeader.RTR = CAN_RTR_DATA;
+  TxHeader.StdId = 0x466;
+	*/
+  TIM4->CCR1 = 2500;
+//  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -151,8 +188,25 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  //HAL_UART_Transmit(&huart4, tx_buffer, TX_BUFFER, UART_TIMEOUT);
-	  //HAL_Delay(DELAY);
+	  switch (communication_type) {
+	  	  case NONE:
+	  		  if (TIM4->CR1 & TIM_CR1_CEN) {
+	  			  HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+	  		  }
+	  		  break;
+	  	  case PWM:
+	  		  if (!(TIM4->CR1 & TIM_CR1_CEN)) {
+	  			  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+	  		  }
+	  		  break;
+	  	  case CAN:
+	  		  if (TIM4->CR1 & TIM_CR1_CEN) {
+	  			  HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+	  		  }
+	  		  break;
+	  	  default:
+	  		  break;
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -179,7 +233,7 @@ void SystemClock_Config(void)
   * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
@@ -212,6 +266,43 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief CAN1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CAN1_Init(void)
+{
+
+  /* USER CODE BEGIN CAN1_Init 0 */
+
+  /* USER CODE END CAN1_Init 0 */
+
+  /* USER CODE BEGIN CAN1_Init 1 */
+
+  /* USER CODE END CAN1_Init 1 */
+  hcan1.Instance = CAN1;
+  hcan1.Init.Prescaler = 24;
+  hcan1.Init.Mode = CAN_MODE_NORMAL;
+  hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
+  hcan1.Init.TimeSeg1 = CAN_BS1_2TQ;
+  hcan1.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan1.Init.TimeTriggeredMode = DISABLE;
+  hcan1.Init.AutoBusOff = DISABLE;
+  hcan1.Init.AutoWakeUp = DISABLE;
+  hcan1.Init.AutoRetransmission = DISABLE;
+  hcan1.Init.ReceiveFifoLocked = DISABLE;
+  hcan1.Init.TransmitFifoPriority = DISABLE;
+  if (HAL_CAN_Init(&hcan1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CAN1_Init 2 */
+
+  /* USER CODE END CAN1_Init 2 */
+
 }
 
 /**
@@ -264,51 +355,61 @@ static void MX_ETH_Init(void)
 }
 
 /**
-  * @brief TIM3 Initialization Function
+  * @brief TIM4 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM3_Init(void)
+static void MX_TIM4_Init(void)
 {
 
-  /* USER CODE BEGIN TIM3_Init 0 */
+  /* USER CODE BEGIN TIM4_Init 0 */
 
-  /* USER CODE END TIM3_Init 0 */
+  /* USER CODE END TIM4_Init 0 */
 
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
 
-  /* USER CODE BEGIN TIM3_Init 1 */
+  /* USER CODE BEGIN TIM4_Init 1 */
 
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 48000-1;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 2000-1;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_OC_Init(&htim3) != HAL_OK)
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 96-1;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 5000-1;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_TIMING;
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM3_Init 2 */
+  /* USER CODE BEGIN TIM4_Init 2 */
 
-  /* USER CODE END TIM3_Init 2 */
-  HAL_TIM_MspPostInit(&htim3);
+  /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
 
 }
 
@@ -418,6 +519,22 @@ static void MX_USB_OTG_FS_PCD_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -492,21 +609,27 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 				}
 			}
 
-			for (int i = 0; i <= NUMBERS; i++) {
-				if (rx_data[3] == numbers[i]) {
-					rx_numbers_index++;
-					break;
+			if (rx_numbers_index == 1) {
+				for (int i = 0; i <= NUMBERS; i++) {
+					if (rx_data[3] == numbers[i]) {
+						rx_numbers_index++;
+						break;
+					}
 				}
 			}
 
-			for (int i = 0; i <= NUMBERS; i++) {
-				if (rx_data[4] == numbers[i]) {
-					rx_numbers_index++;
-					break;
+			if (rx_numbers_index == 2) {
+				for (int i = 0; i <= NUMBERS; i++) {
+					if (rx_data[4] == numbers[i]) {
+						rx_numbers_index++;
+						break;
+					}
 				}
 			}
 
 			if (rx_numbers_index == 3) {
+
+				// percentage of speed 0 - 100 %
 				percentageNumber = 100 * ((int)rx_data[2] - 48) + 10 * ((int)rx_data[3] - 48) + ((int)rx_data[4] - 48);
 
 				if (percentageNumber > 100) {
@@ -515,7 +638,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 					rx_data[3] = (uint8_t) 48;
 					rx_data[4] = (uint8_t) 48;
 				}
+				// Can data
+				txData[0] = percentageNumber;
 
+				// Message for user
 				if (rx_data[2] == '0') {
 					tx_perc[9] = ' ';
 				} else {
@@ -526,7 +652,60 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 				HAL_UART_Transmit(&huart4, tx_perc, TX_PERC, UART_TIMEOUT);
 
+				// Duty
+				TIM4->CCR1 = 4000 * percentageNumber/100 + 500;
+				test = 4000 * percentageNumber/100 + 500;
+
 				at_found = 0;
+			}
+
+			if (rx_data[2] == 'N' && rx_data[3] == 'O' && rx_data[4] == 'N') {
+				communication_type = NONE;
+
+				tx_type[9] = rx_data[2];
+				tx_type[10] = rx_data[3];
+				tx_type[11] = rx_data[4];
+				tx_type[12] = 'E';
+
+				tx_ask[10] = rx_data[2];
+				tx_ask[11] = rx_data[3];
+				tx_ask[12] = rx_data[4];
+				tx_ask[13] = 'E';
+
+				HAL_UART_Transmit(&huart4, tx_type, TX_TYPE, UART_TIMEOUT);
+			}
+			if (rx_data[2] == 'P' && rx_data[3] == 'W' && rx_data[4] == 'M') {
+				communication_type = PWM;
+
+				tx_type[9] = rx_data[2];
+				tx_type[10] = rx_data[3];
+				tx_type[11] = rx_data[4];
+				tx_type[12] = ' ';
+
+				tx_ask[10] = rx_data[2];
+				tx_ask[11] = rx_data[3];
+				tx_ask[12] = rx_data[4];
+				tx_ask[13] = ' ';
+
+				HAL_UART_Transmit(&huart4, tx_type, TX_TYPE, UART_TIMEOUT);
+			}
+			if (rx_data[2] == 'C' && rx_data[3] == 'A' && rx_data[4] == 'N') {
+				communication_type = CAN;
+				tx_type[9] = rx_data[2];
+				tx_type[10] = rx_data[3];
+				tx_type[11] = rx_data[4];
+				tx_type[12] = ' ';
+
+				tx_ask[10] = rx_data[2];
+				tx_ask[11] = rx_data[3];
+				tx_ask[12] = rx_data[4];
+				tx_ask[13] = ' ';
+
+				HAL_UART_Transmit(&huart4, tx_type, TX_TYPE, UART_TIMEOUT);
+			}
+
+			if (rx_data[2] == 'W' && rx_data[3] == 'H' && rx_data[4] == 'T') {
+				HAL_UART_Transmit(&huart4, tx_ask, TX_ASK, UART_TIMEOUT);
 			}
 		}
 		HAL_UART_Receive_IT(&huart4, rx_data, RX_DATA);
@@ -534,15 +713,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 
 }
-
-// timer 3 callback
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	if (htim == &htim3) {
-		// timer here (1s).
-	}
-}
-
-
 /* USER CODE END 4 */
 
 /**

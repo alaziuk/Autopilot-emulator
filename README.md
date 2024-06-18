@@ -13,4 +13,7 @@ The project uses interrupts to listen to a 5-byte message. The message begins wi
 
 The value is capped at 100, because it's a percentage representation for speed. Meaning that if input is > 100, it's considered a 100.
 
-It's currently being expanded to have PWM and CAN communication.
+It currently have PWM communication at 200 Hz. The duty for speed control is currently: 0% speed - 10% duty to 100% - 90% duty.
+
+### What's next?
+It's going to be expanded to have CAN communication.
