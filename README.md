@@ -4,7 +4,6 @@ Emulates behavior of autopilot for drones. In this example it's communicating th
 
 It's a STM32CubeIDE project for NUCLEO-F767ZL.
 
-## Usage
 The project uses interrupts to listen to a 5-byte message. The message begins with "AT" and ends with "xyz", where:
 * x is the value of the hundreds place
 * y is the value of the tens place
@@ -12,3 +11,4 @@ The project uses interrupts to listen to a 5-byte message. The message begins wi
 
 The value is capped at 100, because it's a percentage representation for speed. Meaning that if input is > 100, it's considered a 100.
 
+It's currently being expanded to have PWM and CAN communication.
