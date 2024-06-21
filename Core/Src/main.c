@@ -41,7 +41,8 @@ typedef enum {
 #define TX_BOOT 17
 #define TX_PERC 17
 #define TX_TYPE 17
-#define TX_ASK 17
+#define TX_ASK 16
+#define TX_SPEED 17
 #define RX_DATA 5
 #define UART_TIMEOUT 15
 #define NUMBERS 10
@@ -89,7 +90,8 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 const uint8_t tx_boot[TX_BOOT] = "I'm up babyyyyy\n\r";
 uint8_t tx_perc[TX_PERC] = "Ustawiam xyz%  \n\r";
 uint8_t tx_type[TX_TYPE] = "Ustawiam xyz   \n\r";
-uint8_t tx_ask[TX_ASK] = "Ustawione NONE \n\r";
+uint8_t tx_ask[TX_ASK] = "Ustawione NONE \n";
+uint8_t tx_ask_speed[TX_SPEED] = "Ustawione  50% \n\r";
 uint8_t rx_data[RX_DATA];
 
 const uint8_t numbers[NUMBERS] = {'0', '1', '2', '3' , '4', '5', '6', '7', '8', '9'};
@@ -644,11 +646,17 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 				// Message for user
 				if (rx_data[2] == '0') {
 					tx_perc[9] = ' ';
+					tx_ask_speed[10] = ' ';
 				} else {
 					tx_perc[9] = rx_data[2];
+					tx_ask_speed[10] = rx_data[2];
 				}
 				tx_perc[10] = rx_data[3];
 				tx_perc[11] = rx_data[4];
+
+
+				tx_ask_speed[11] = rx_data[3];
+				tx_ask_speed[12] = rx_data[4];
 
 				HAL_UART_Transmit(&huart4, tx_perc, TX_PERC, UART_TIMEOUT);
 
@@ -706,6 +714,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 			if (rx_data[2] == 'W' && rx_data[3] == 'H' && rx_data[4] == 'T') {
 				HAL_UART_Transmit(&huart4, tx_ask, TX_ASK, UART_TIMEOUT);
+				HAL_UART_Transmit(&huart4, tx_ask_speed, TX_SPEED, UART_TIMEOUT);
 			}
 		}
 		HAL_UART_Receive_IT(&huart4, rx_data, RX_DATA);
